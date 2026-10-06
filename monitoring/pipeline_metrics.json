@@ -1,0 +1,15 @@
+{
+    "pipeline_name": "NovaPay Financial Transaction Lakehouse",
+    "generated_at_utc": "2026-10-06T20:19:55.131398+00:00",
+    "status": "SUCCESS",
+    "bronze_records": 1010,
+    "silver_records": 950,
+    "quarantined_records": 51,
+    "records_removed_during_quality_processing": 9,
+    "gold_risk_records": 950,
+    "high_risk_transactions": 16,
+    "medium_risk_transactions": 475,
+    "low_risk_transactions": 459,
+    "silver_retention_rate_percent": 94.06,
+    "quarantine_rate_percent": 5.05
+}
