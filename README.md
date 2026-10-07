@@ -1,6 +1,6 @@
 # Real-Time Financial Transaction Lakehouse
 
-A production-style data engineering portfolio project demonstrating real-time financial transaction ingestion, stream processing, Medallion Architecture, data-quality validation, analytics, rule-based risk scoring, monitoring, automated testing, CI/CD, and Azure cloud deployment.
+A production-style data engineering portfolio project demonstrating **real-time financial transaction ingestion, stream processing, Medallion Architecture, data-quality validation, analytics, rule-based risk scoring, monitoring, automated testing, CI/CD, and Azure cloud deployment**.
 
 The project simulates a financial transaction platform for the fictional company **NovaPay Financial**.
 
@@ -14,57 +14,133 @@ This project implements the pipeline in two environments:
 
 ### Local Development Architecture
 
-**Python → Apache Kafka → Spark Structured Streaming → Bronze → Data Quality → Silver / Quarantine → Gold Analytics → Risk Scoring → Monitoring**
+```text
+Python
+   ↓
+Apache Kafka
+   ↓
+Spark Structured Streaming
+   ↓
+Bronze
+   ↓
+Data Quality
+   ↓
+Silver / Quarantine
+   ↓
+Gold Analytics
+   ↓
+Risk Scoring
+   ↓
+Monitoring
+```
 
 ### Azure Cloud Architecture
 
-**Python → Azure Event Hubs → Azure Databricks Serverless → Spark Structured Streaming → Delta Lake / Unity Catalog → Bronze → Data Quality → Silver / Quarantine → Gold Analytics**
-
-The project demonstrates event streaming, schema enforcement, data-quality controls, deduplication, Medallion Architecture, analytical transformations, secure cloud connectivity, streaming checkpointing, monitoring, automated testing, and CI/CD.
-
----
-
-## Architecture
-
-```mermaid
-flowchart LR
-    A["Python Transaction Generator"] --> B["Azure Event Hubs"]
-    B --> C["Azure Databricks"]
-    C --> D["Spark Structured Streaming"]
-    D --> E["Bronze Delta Table"]
-
-    E --> F["Data Quality"]
-
-    F -->|Valid| G["Silver Delta Table"]
-    F -->|Invalid| H["Quarantine Delta Table"]
-
-    G --> I["Gold Transformations"]
-
-    I --> J["Business Metrics"]
-    I --> K["Rule-Based Risk Scoring"]
-
-    J --> L["Gold Delta Tables"]
-    K --> L
-
-    M["Unity Catalog"] --> E
-    M --> G
-    M --> H
-    M --> L
-
-    N["Streaming Checkpoint"] --> D
-
-    O["Pytest"] --> P["GitHub Actions CI"]
+```text
+Python
+   ↓
+Azure Event Hubs
+   ↓
+Azure Databricks Serverless
+   ↓
+Spark Structured Streaming
+   ↓
+Delta Lake / Unity Catalog
+   ↓
+Bronze
+   ↓
+Data Quality
+   ↓
+Silver / Quarantine
+   ↓
+Gold Analytics
 ```
 
-The project was first developed locally using Apache Kafka, Docker, and Spark and was subsequently deployed to Azure using Azure Event Hubs and Azure Databricks.
-
-Detailed architecture documentation is available in:
-
-`architecture/architecture.md`
+The project demonstrates **event streaming, schema enforcement, data-quality controls, deduplication, Medallion Architecture, analytical transformations, secure cloud connectivity, streaming checkpointing, monitoring, automated testing, and CI/CD**.
 
 ---
 
-## Technology Stack
+# Azure Deployment Results
+
+The pipeline was deployed and validated on Azure using **Azure Event Hubs** and **Azure Databricks Serverless**.
+
+## Real-Time Event Ingestion — Azure Event Hubs
+
+![Azure Event Hubs Transaction Ingestion](docs/images/azure-event-hubs-ingestion.png)
+
+Azure Event Hubs successfully received **1,010 simulated financial transaction events** across three partitions, validating the cloud event-ingestion layer.
+
+Verified cloud ingestion:
+
+| Metric | Result |
+|---|---:|
+| Transactions loaded | 1,010 |
+| Successful events | 1,010 |
+| Failed events | 0 |
+| Producer throughput | 439.76 events/sec |
+
+Azure Event Hubs metrics confirmed approximately **1.01K incoming messages**.
+
+---
+
+## Lakehouse Tables — Azure Databricks
+
+![Azure Databricks Lakehouse Tables](docs/images/azure-databricks-lakehouse.png)
+
+Azure Databricks and Unity Catalog were used to organize managed Delta tables across the **Bronze, Silver, Quarantine, and Gold** layers.
+
+The deployed lakehouse includes tables such as:
+
+- `bronze_transactions`
+- `bronze_transactions_streaming`
+- `silver_transactions`
+- `quarantine_transactions`
+- `gold_daily_metrics`
+- `gold_merchant_metrics`
+- `gold_country_metrics`
+- `gold_payment_method_metrics`
+- `gold_risk_scored_transactions`
+- `gold_risk_summary`
+
+---
+
+## End-to-End Cloud Pipeline Validation
+
+![NovaPay Cloud Lakehouse Validation](docs/images/novapay-cloud-validation.png)
+
+The completed Azure lakehouse was validated end-to-end.
+
+| Metric | Result |
+|---|---:|
+| Event Hubs ingestion | 1,010 |
+| Bronze batch | 1,010 |
+| Bronze streaming | 1,010 |
+| Silver | 950 |
+| Quarantine | 51 |
+| Valid duplicates removed | 9 |
+| Gold risk-scored transactions | 950 |
+| HIGH risk | 16 |
+| MEDIUM risk | 475 |
+| LOW risk | 459 |
+| Total simulated transaction value | $4,733,704.43 |
+
+This validates the complete cloud path from transaction generation through **Azure Event Hubs → Azure Databricks → Spark Structured Streaming → Delta Lake → Data Quality → Silver/Quarantine → Gold Analytics**.
+
+---
+
+# Architecture
+
+The project was first developed locally using **Apache Kafka, Docker, and Apache Spark** and was subsequently deployed to Azure using **Azure Event Hubs and Azure Databricks**.
+
+Detailed architecture documentation is available at:
+
+```text
+architecture/architecture.md
+```
+
+---
+
+# Technology Stack
 
 | Category | Technology |
 |---|---|
@@ -89,9 +165,9 @@ Detailed architecture documentation is available in:
 
 ---
 
-## Pipeline Flow
+# Pipeline Flow
 
-### 1. Synthetic Transaction Generation
+## 1. Synthetic Transaction Generation
 
 The Python transaction generator creates realistic simulated financial transaction events containing:
 
@@ -131,7 +207,7 @@ For local development, transactions are published to the Kafka topic:
 financial-transactions
 ```
 
-The topic uses three partitions.
+The topic uses **three partitions**.
 
 Measured local Kafka results:
 
@@ -163,7 +239,7 @@ Partitions: 3
 Kafka-compatible endpoint: Enabled
 ```
 
-A Python producer using the Azure Event Hubs SDK publishes the same simulated transaction events to Azure.
+A Python producer using the Azure Event Hubs SDK publishes the simulated transaction events to Azure.
 
 Verified cloud ingestion:
 
@@ -176,7 +252,7 @@ Producer throughput:      439.76 events/sec
 
 Azure Event Hubs metrics confirmed approximately **1.01K incoming messages**.
 
-Producer credentials are supplied through an environment variable rather than stored in source code.
+Producer credentials are supplied through an **environment variable** rather than stored in source code.
 
 ---
 
@@ -193,9 +269,9 @@ The pipeline captures transaction data along with streaming metadata including:
 
 This provides traceability between source events and lakehouse records.
 
-The local implementation consumes from Apache Kafka, while the Azure implementation consumes from the Kafka-compatible Azure Event Hubs endpoint using Azure Databricks.
+The local implementation consumes from **Apache Kafka**, while the Azure implementation consumes from the Kafka-compatible **Azure Event Hubs** endpoint using Azure Databricks.
 
-The cloud streaming implementation was validated using a bounded `availableNow` trigger and persisted the streaming checkpoint in a Unity Catalog Volume.
+The cloud streaming implementation was validated using a bounded `availableNow` trigger and persisted the streaming checkpoint in a **Unity Catalog Volume**.
 
 Verified Azure Structured Streaming records:
 
@@ -211,11 +287,11 @@ The Bronze layer stores incoming transaction events with minimal transformation.
 
 ### Local Bronze
 
-Local Bronze data is persisted using Apache Parquet.
+Local Bronze data is persisted using **Apache Parquet**.
 
 ### Azure Bronze
 
-The Azure implementation persists Bronze data as managed Delta tables in Azure Databricks and Unity Catalog.
+The Azure implementation persists Bronze data as managed **Delta tables** in Azure Databricks and Unity Catalog.
 
 Verified results:
 
@@ -253,9 +329,9 @@ Duplicate removal is performed on valid transactions before writing the final Si
 
 Records passing validation are standardized and deduplicated before being written to Silver.
 
-Invalid records are written separately to the Quarantine layer with validation information.
+Invalid records are written separately to the **Quarantine layer** with validation information.
 
-Verified local and Azure processing results:
+Verified processing results:
 
 | Metric | Result |
 |---|---:|
@@ -294,7 +370,7 @@ These datasets support reporting and analytical use cases without requiring cons
 
 ## 9. Transaction Risk Scoring
 
-The project implements transparent, rule-based transaction risk scoring.
+The project implements transparent, **rule-based transaction risk scoring**.
 
 Rules include:
 
@@ -347,7 +423,9 @@ This is an explainable **rule-based risk-scoring system**, not a trained fraud-d
 
 Total processed Silver transaction value:
 
-**$4,733,704.43**
+```text
+$4,733,704.43
+```
 
 ---
 
@@ -365,7 +443,7 @@ The implementation uses:
 - Unity Catalog Volumes for streaming checkpoints
 - Unity Catalog secrets for secure Event Hubs connectivity
 
-The cloud pipeline created Bronze, Silver, Quarantine, and Gold tables under the NovaPay Unity Catalog schema.
+The cloud pipeline created **Bronze, Silver, Quarantine, and Gold** tables under the NovaPay Unity Catalog schema.
 
 Example deployed tables:
 
@@ -382,7 +460,9 @@ gold_risk_scored_transactions
 gold_risk_summary
 ```
 
-Credentials are not stored in notebooks or committed to GitHub. Azure Event Hubs consumer credentials are retrieved securely at runtime from a Unity Catalog secret.
+Credentials are not stored in notebooks or committed to GitHub.
+
+Azure Event Hubs consumer credentials are retrieved securely at runtime from a **Unity Catalog secret**.
 
 ---
 
@@ -446,14 +526,12 @@ Automated PySpark tests cover important data-quality and business rules.
 
 Test cases include:
 
-```text
-Valid transaction accepted
-Negative amount rejected
-Missing customer rejected
-Invalid currency rejected
-Duplicate transaction removed
-High-value transaction receives elevated risk
-```
+- Valid transaction accepted
+- Negative amount rejected
+- Missing customer rejected
+- Invalid currency rejected
+- Duplicate transaction removed
+- High-value transaction receives elevated risk
 
 Test result:
 
@@ -489,7 +567,7 @@ Workflow:
 
 ---
 
-## Project Structure
+# Project Structure
 
 ```text
 realtime-financial-transaction-lakehouse/
@@ -504,7 +582,12 @@ realtime-financial-transaction-lakehouse/
 ├── config/
 ├── dashboards/
 ├── docker/
+│
 ├── docs/
+│   └── images/
+│       ├── azure-event-hubs-ingestion.png
+│       ├── azure-databricks-lakehouse.png
+│       └── novapay-cloud-validation.png
 │
 ├── monitoring/
 │   ├── pipeline_monitor.py
@@ -530,6 +613,9 @@ realtime-financial-transaction-lakehouse/
 │   └── transformations/
 │       └── gold_transform.py
 │
+├── databricks/
+│   └── novapay_financial_transaction_lakehouse.py
+│
 ├── tests/
 │   └── test_quality_rules.py
 │
@@ -541,9 +627,9 @@ realtime-financial-transaction-lakehouse/
 
 ---
 
-## Local Setup
+# Local Setup
 
-### Requirements
+## Requirements
 
 Install:
 
@@ -569,7 +655,7 @@ pip install -r requirements.txt
 
 ---
 
-## Run the Local Pipeline
+# Run the Local Pipeline
 
 Start Kafka:
 
@@ -623,7 +709,7 @@ python -m pytest tests/ -v
 
 ---
 
-## Azure Event Hubs Producer
+# Azure Event Hubs Producer
 
 The Azure producer is available at:
 
@@ -640,11 +726,11 @@ $env:AZURE_EVENTHUB_CONNECTION_STRING="<your-send-only-connection-string>"
 python src/producer/azure_eventhub_producer.py
 ```
 
-**Never commit Azure connection strings, SAS keys, passwords, or Databricks credentials to source control.**
+> **Security:** Never commit Azure connection strings, SAS keys, passwords, or Databricks credentials to source control.
 
 ---
 
-## Key Engineering Concepts Demonstrated
+# Key Engineering Concepts Demonstrated
 
 - Real-time event-driven data pipelines
 - Apache Kafka
@@ -672,7 +758,7 @@ python src/producer/azure_eventhub_producer.py
 
 ---
 
-## Future Enhancements
+# Future Enhancements
 
 Potential future extensions include:
 
@@ -690,16 +776,34 @@ Potential future extensions include:
 
 ---
 
-## Project Status
+# Project Status
 
-**Local pipeline: Complete**
+**Local pipeline:** Complete
 
-**Azure cloud deployment: Complete**
+**Azure cloud deployment:** Complete
 
-**Spark Structured Streaming deployment: Complete**
+**Spark Structured Streaming deployment:** Complete
 
-**Azure Databricks lakehouse validation: Complete**
+**Azure Databricks lakehouse validation:** Complete
 
-The project provides a working portfolio-scale implementation from synthetic transaction generation through local Kafka processing and Azure Event Hubs ingestion to Spark Structured Streaming, Delta Lake Medallion processing, data-quality controls, Gold analytics, monitoring, testing, and CI/CD.
+**Automated testing:** 6/6 tests passing
 
-The cloud deployment was validated with **1,010 ingested events, 950 clean Silver transactions, 51 quarantined records, 9 valid duplicates removed, and 950 Gold risk-scored transactions**.
+**GitHub Actions CI:** Passing
+
+The project provides a working **portfolio-scale implementation** from synthetic transaction generation through local Kafka processing and Azure Event Hubs ingestion to Spark Structured Streaming, Delta Lake Medallion processing, data-quality controls, Gold analytics, monitoring, testing, and CI/CD.
+
+The cloud deployment was validated with:
+
+```text
+1,010 ingested events
+950 clean Silver transactions
+51 quarantined records
+9 valid duplicates removed
+950 Gold risk-scored transactions
+```
+
+---
+
+## About
+
+End-to-end real-time financial transaction data pipeline using **Python, Apache Kafka, Azure Event Hubs, Spark Structured Streaming, PySpark, Azure Databricks, Delta Lake, Unity Catalog, Medallion Architecture, data quality, Docker, automated testing, and GitHub Actions CI/CD**.
