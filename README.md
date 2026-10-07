@@ -1,6 +1,6 @@
 # Real-Time Financial Transaction Lakehouse
 
-A production-style data engineering project that demonstrates real-time financial transaction ingestion, stream processing, Medallion Architecture, data-quality validation, analytics, risk scoring, monitoring, automated testing, and CI/CD.
+A production-style data engineering portfolio project demonstrating real-time financial transaction ingestion, stream processing, Medallion Architecture, data-quality validation, analytics, rule-based risk scoring, monitoring, automated testing, CI/CD, and Azure cloud deployment.
 
 The project simulates a financial transaction platform for the fictional company **NovaPay Financial**.
 
@@ -10,11 +10,17 @@ The project simulates a financial transaction platform for the fictional company
 
 Modern financial platforms generate large volumes of transaction events that must be processed reliably while preventing invalid or duplicate data from reaching downstream analytics.
 
-This project implements an end-to-end transaction data pipeline using:
+This project implements the pipeline in two environments:
+
+### Local Development Architecture
 
 **Python → Apache Kafka → Spark Structured Streaming → Bronze → Data Quality → Silver / Quarantine → Gold Analytics → Risk Scoring → Monitoring**
 
-The pipeline demonstrates practical data engineering concepts including event streaming, schema enforcement, data-quality controls, deduplication, layered lakehouse design, analytical transformations, monitoring, testing, and continuous integration.
+### Azure Cloud Architecture
+
+**Python → Azure Event Hubs → Azure Databricks Serverless → Spark Structured Streaming → Delta Lake / Unity Catalog → Bronze → Data Quality → Silver / Quarantine → Gold Analytics**
+
+The project demonstrates event streaming, schema enforcement, data-quality controls, deduplication, Medallion Architecture, analytical transformations, secure cloud connectivity, streaming checkpointing, monitoring, automated testing, and CI/CD.
 
 ---
 
@@ -22,30 +28,35 @@ The pipeline demonstrates practical data engineering concepts including event st
 
 ```mermaid
 flowchart LR
-    A["Python Transaction Generator"] --> B["Apache Kafka"]
-    B --> C["Spark Structured Streaming"]
-    C --> D["Bronze Layer"]
+    A["Python Transaction Generator"] --> B["Azure Event Hubs"]
+    B --> C["Azure Databricks"]
+    C --> D["Spark Structured Streaming"]
+    D --> E["Bronze Delta Table"]
 
-    D --> E["Data Quality"]
+    E --> F["Data Quality"]
 
-    E -->|Valid| F["Silver Layer"]
-    E -->|Invalid| G["Quarantine"]
+    F -->|Valid| G["Silver Delta Table"]
+    F -->|Invalid| H["Quarantine Delta Table"]
 
-    F --> H["Gold Transformations"]
+    G --> I["Gold Transformations"]
 
-    H --> I["Business Metrics"]
-    H --> J["Risk Scoring"]
+    I --> J["Business Metrics"]
+    I --> K["Rule-Based Risk Scoring"]
 
-    I --> K["Analytics"]
-    J --> K
+    J --> L["Gold Delta Tables"]
+    K --> L
 
-    D --> L["Monitoring"]
-    F --> L
-    G --> L
-    J --> L
+    M["Unity Catalog"] --> E
+    M --> G
+    M --> H
+    M --> L
 
-    M["Pytest"] --> N["GitHub Actions CI"]
+    N["Streaming Checkpoint"] --> D
+
+    O["Pytest"] --> P["GitHub Actions CI"]
 ```
+
+The project was first developed locally using Apache Kafka, Docker, and Spark and was subsequently deployed to Azure using Azure Event Hubs and Azure Databricks.
 
 Detailed architecture documentation is available in:
 
@@ -58,10 +69,14 @@ Detailed architecture documentation is available in:
 | Category | Technology |
 |---|---|
 | Programming | Python |
-| Event Streaming | Apache Kafka |
+| Local Event Streaming | Apache Kafka |
+| Cloud Event Streaming | Azure Event Hubs |
 | Stream Processing | Apache Spark Structured Streaming |
 | Data Processing | PySpark |
-| Storage Format | Apache Parquet |
+| Cloud Compute | Azure Databricks Serverless |
+| Cloud Storage Format | Delta Lake |
+| Local Storage Format | Apache Parquet |
+| Data Governance / Catalog | Unity Catalog |
 | Architecture | Medallion Architecture |
 | Data Layers | Bronze, Silver, Gold, Quarantine |
 | Containerization | Docker / Docker Compose |
@@ -78,7 +93,7 @@ Detailed architecture documentation is available in:
 
 ### 1. Synthetic Transaction Generation
 
-The Python transaction generator creates realistic financial transaction events containing:
+The Python transaction generator creates realistic simulated financial transaction events containing:
 
 - Transaction ID
 - Customer ID
@@ -95,22 +110,22 @@ The Python transaction generator creates realistic financial transaction events 
 - Transaction status
 - Event timestamp
 
-The generator intentionally introduces bad records and duplicate transaction IDs so the downstream data-quality layer can be tested.
+The generator intentionally introduces bad records and duplicate transaction IDs so downstream data-quality controls can be tested.
 
-The generated dataset contained:
+Generated dataset:
 
 ```text
 1,000 base transactions
-+ 10 duplicate records
-----------------------
++   10 duplicate records
+-----------------------
 1,010 total records
 ```
 
 ---
 
-## 2. Apache Kafka Streaming
+## 2. Local Apache Kafka Streaming
 
-Transactions are published to the Kafka topic:
+For local development, transactions are published to the Kafka topic:
 
 ```text
 financial-transactions
@@ -118,53 +133,104 @@ financial-transactions
 
 The topic uses three partitions.
 
-A Python Kafka producer publishes JSON transaction events to the Kafka broker.
-
-During the project execution:
+Measured local Kafka results:
 
 ```text
 Messages published: 1,010
 Successful:         1,010
-Failed:             0
+Failed:                 0
+Throughput:        496.75 messages/sec
 ```
 
-Kafka provides the event-streaming layer between transaction generation and Spark processing.
+Kafka provides the local event-streaming layer between transaction generation and Spark processing.
 
 ---
 
-## 3. Spark Structured Streaming
+## 3. Azure Event Hubs Deployment
 
-Spark Structured Streaming consumes transaction events from Kafka.
+The cloud implementation uses **Azure Event Hubs** as the managed event-ingestion service.
 
-The streaming pipeline captures both transaction data and Kafka metadata including:
-
-- Kafka partition
-- Kafka offset
-- Kafka timestamp
-- Ingestion timestamp
-
-This metadata provides traceability between the source event stream and lakehouse records.
-
----
-
-## 4. Bronze Layer
-
-The Bronze layer stores the raw transaction events consumed from Kafka with minimal transformation.
-
-Measured Bronze results:
+Event Hub:
 
 ```text
-Records: 1,010
-Columns: 18
+financial-transactions
 ```
 
-The raw transaction values are preserved so data-quality issues can be identified downstream.
+Configuration:
+
+```text
+Partitions: 3
+Kafka-compatible endpoint: Enabled
+```
+
+A Python producer using the Azure Event Hubs SDK publishes the same simulated transaction events to Azure.
+
+Verified cloud ingestion:
+
+```text
+Transactions loaded:       1,010
+Successful events:         1,010
+Failed events:                 0
+Producer throughput:      439.76 events/sec
+```
+
+Azure Event Hubs metrics confirmed approximately **1.01K incoming messages**.
+
+Producer credentials are supplied through an environment variable rather than stored in source code.
 
 ---
 
-## 5. Data Quality
+## 4. Spark Structured Streaming
 
-The data-quality pipeline validates transaction records before they enter the trusted Silver layer.
+Spark Structured Streaming consumes transaction events from the streaming source.
+
+The pipeline captures transaction data along with streaming metadata including:
+
+- Partition
+- Offset
+- Source timestamp
+- Ingestion timestamp
+
+This provides traceability between source events and lakehouse records.
+
+The local implementation consumes from Apache Kafka, while the Azure implementation consumes from the Kafka-compatible Azure Event Hubs endpoint using Azure Databricks.
+
+The cloud streaming implementation was validated using a bounded `availableNow` trigger and persisted the streaming checkpoint in a Unity Catalog Volume.
+
+Verified Azure Structured Streaming records:
+
+```text
+1,010
+```
+
+---
+
+## 5. Bronze Layer
+
+The Bronze layer stores incoming transaction events with minimal transformation.
+
+### Local Bronze
+
+Local Bronze data is persisted using Apache Parquet.
+
+### Azure Bronze
+
+The Azure implementation persists Bronze data as managed Delta tables in Azure Databricks and Unity Catalog.
+
+Verified results:
+
+```text
+Bronze batch records:       1,010
+Bronze streaming records:   1,010
+```
+
+Raw transaction values and ingestion metadata are retained so data-quality issues can be identified downstream.
+
+---
+
+## 6. Data Quality
+
+The data-quality pipeline validates transactions before they enter the trusted Silver layer.
 
 Validation includes checks for:
 
@@ -177,17 +243,19 @@ Validation includes checks for:
 - Missing or invalid timestamps
 - Duplicate transaction IDs
 
-Invalid records are separated from trusted records instead of silently discarded.
+Invalid records are separated from trusted records rather than silently discarded.
+
+Duplicate removal is performed on valid transactions before writing the final Silver dataset.
 
 ---
 
-## 6. Silver and Quarantine Layers
+## 7. Silver and Quarantine Layers
 
-Records that pass validation are standardized and deduplicated before being written to Silver.
+Records passing validation are standardized and deduplicated before being written to Silver.
 
-Invalid records are written to the Quarantine layer with an error reason.
+Invalid records are written separately to the Quarantine layer with validation information.
 
-Measured results:
+Verified local and Azure processing results:
 
 | Metric | Result |
 |---|---:|
@@ -199,34 +267,36 @@ Measured results:
 | Silver retention rate | 94.06% |
 | Quarantine rate | 5.05% |
 
-The Silver layer therefore contains **950 clean, deduplicated transactions** ready for downstream analytics.
+The Silver layer therefore contains **950 clean, deduplicated transactions**.
+
+The Azure implementation persists Silver and Quarantine datasets as managed Delta tables in Unity Catalog.
 
 ---
 
-## 7. Gold Analytics
+## 8. Gold Analytics
 
-The Gold layer converts clean Silver data into business-oriented analytical datasets.
+The Gold layer converts trusted Silver data into business-oriented analytical datasets.
 
-Generated Gold datasets include:
+Azure Databricks Gold tables include:
 
 ```text
-daily_transaction_metrics
-merchant_transaction_metrics
-country_transaction_metrics
-payment_method_metrics
-risk_scored_transactions
-risk_summary
+gold_daily_metrics
+gold_merchant_metrics
+gold_country_metrics
+gold_payment_method_metrics
+gold_risk_scored_transactions
+gold_risk_summary
 ```
 
-These datasets support reporting and analytical use cases without requiring consumers to repeatedly process raw transaction data.
+These datasets support reporting and analytical use cases without requiring consumers to repeatedly process raw transaction events.
 
 ---
 
-## 8. Transaction Risk Scoring
+## 9. Transaction Risk Scoring
 
-The project includes a transparent rule-based transaction risk-scoring component.
+The project implements transparent, rule-based transaction risk scoring.
 
-Example rules include:
+Rules include:
 
 ```text
 Transaction amount > $5,000   → +30
@@ -237,12 +307,12 @@ Declined transaction          → +20
 Risk categories:
 
 ```text
-0–29   LOW
-30–59  MEDIUM
-60+    HIGH
+0–29    LOW
+30–59   MEDIUM
+60+     HIGH
 ```
 
-Measured results across the 950 Silver transactions:
+Verified results across the 950 Silver transactions:
 
 | Risk Level | Transactions |
 |---|---:|
@@ -251,11 +321,11 @@ Measured results across the 950 Silver transactions:
 | HIGH | 16 |
 | **Total** | **950** |
 
-This component demonstrates explainable transaction-risk processing. It is a rule-based scoring system rather than a trained fraud-detection machine-learning model.
+This is an explainable **rule-based risk-scoring system**, not a trained fraud-detection machine-learning model.
 
 ---
 
-## 9. Business Analytics Results
+## 10. Business Analytics Results
 
 ### Country Distribution
 
@@ -268,12 +338,12 @@ This component demonstrates explainable transaction-risk processing. It is a rul
 
 ### Payment Methods
 
-| Payment Method | Transactions |
-|---|---:|
-| Credit Card | 246 |
-| Digital Wallet | 237 |
-| Debit Card | 237 |
-| Bank Transfer | 230 |
+| Payment Method | Transactions | Transaction Amount |
+|---|---:|---:|
+| Credit Card | 246 | $1,234,524.86 |
+| Debit Card | 237 | $1,203,175.02 |
+| Digital Wallet | 237 | $1,159,562.42 |
+| Bank Transfer | 230 | $1,136,442.13 |
 
 Total processed Silver transaction value:
 
@@ -281,15 +351,76 @@ Total processed Silver transaction value:
 
 ---
 
-## 10. Pipeline Monitoring
+## 11. Azure Databricks Lakehouse
 
-The monitoring component captures operational pipeline metrics and writes them to:
+The cloud lakehouse was deployed using **Azure Databricks Serverless**.
+
+The implementation uses:
+
+- Spark Structured Streaming
+- PySpark
+- Delta Lake
+- Unity Catalog
+- Managed Delta tables
+- Unity Catalog Volumes for streaming checkpoints
+- Unity Catalog secrets for secure Event Hubs connectivity
+
+The cloud pipeline created Bronze, Silver, Quarantine, and Gold tables under the NovaPay Unity Catalog schema.
+
+Example deployed tables:
+
+```text
+bronze_transactions
+bronze_transactions_streaming
+silver_transactions
+quarantine_transactions
+gold_daily_metrics
+gold_merchant_metrics
+gold_country_metrics
+gold_payment_method_metrics
+gold_risk_scored_transactions
+gold_risk_summary
+```
+
+Credentials are not stored in notebooks or committed to GitHub. Azure Event Hubs consumer credentials are retrieved securely at runtime from a Unity Catalog secret.
+
+---
+
+## 12. Azure Deployment Validation
+
+The completed Azure deployment was validated end-to-end.
+
+```text
+NOVAPAY CLOUD LAKEHOUSE - FINAL VALIDATION
+
+Event Hubs Ingestion     : 1,010
+Bronze Batch             : 1,010
+Bronze Streaming         : 1,010
+Silver                   :   950
+Quarantine               :    51
+Valid Duplicates Removed :     9
+Gold Risk                :   950
+
+HIGH Risk                :    16
+MEDIUM Risk              :   475
+LOW Risk                 :   459
+
+Total Transaction Value  : $4,733,704.43
+```
+
+This verifies the path from synthetic transaction generation through Azure Event Hubs ingestion, Azure Databricks processing, data-quality controls, Delta Lake storage, and Gold analytics.
+
+---
+
+## 13. Pipeline Monitoring
+
+The local monitoring component captures operational pipeline metrics and writes them to:
 
 ```text
 monitoring/pipeline_metrics.json
 ```
 
-Example measured monitoring results:
+Example results:
 
 ```json
 {
@@ -309,9 +440,9 @@ Example measured monitoring results:
 
 ---
 
-## 11. Automated Testing
+## 14. Automated Testing
 
-The project includes automated PySpark tests covering important data-quality and business rules.
+Automated PySpark tests cover important data-quality and business rules.
 
 Test cases include:
 
@@ -324,13 +455,13 @@ Duplicate transaction removed
 High-value transaction receives elevated risk
 ```
 
-Test execution result:
+Test result:
 
 ```text
 6 passed
 ```
 
-Run the test suite with:
+Run tests with:
 
 ```bash
 python -m pytest tests/ -v
@@ -338,11 +469,11 @@ python -m pytest tests/ -v
 
 ---
 
-## 12. CI/CD
+## 15. CI/CD
 
-GitHub Actions provides continuous integration for the project.
+GitHub Actions provides continuous integration.
 
-For pushes and pull requests targeting the `main` branch, the workflow:
+For pushes and pull requests targeting `main`, the workflow:
 
 1. Checks out the repository
 2. Configures Java 17
@@ -350,7 +481,7 @@ For pushes and pull requests targeting the `main` branch, the workflow:
 4. Installs project dependencies
 5. Executes the automated PySpark test suite
 
-Workflow configuration:
+Workflow:
 
 ```text
 .github/workflows/ci.yml
@@ -374,6 +505,7 @@ realtime-financial-transaction-lakehouse/
 ├── dashboards/
 ├── docker/
 ├── docs/
+│
 ├── monitoring/
 │   ├── pipeline_monitor.py
 │   └── pipeline_metrics.json
@@ -383,7 +515,8 @@ realtime-financial-transaction-lakehouse/
 ├── src/
 │   ├── producer/
 │   │   ├── transaction_generator.py
-│   │   └── kafka_producer.py
+│   │   ├── kafka_producer.py
+│   │   └── azure_eventhub_producer.py
 │   │
 │   ├── streaming/
 │   │   ├── spark_test.py
@@ -423,7 +556,7 @@ Install:
 Clone the repository:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/anishachada667-rgb/realtime-financial-transaction-lakehouse.git
 cd realtime-financial-transaction-lakehouse
 ```
 
@@ -431,29 +564,18 @@ Create a virtual environment and install dependencies:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ---
 
-## Start Kafka
+## Run the Local Pipeline
 
-Start the Kafka container:
+Start Kafka:
 
 ```bash
 docker compose up -d
 ```
-
-Kafka runs locally on:
-
-```text
-localhost:9092
-```
-
----
-
-## Run the Pipeline
 
 Generate synthetic transactions:
 
@@ -461,7 +583,7 @@ Generate synthetic transactions:
 python src/producer/transaction_generator.py
 ```
 
-Publish transactions to Kafka:
+Publish transactions:
 
 ```bash
 python src/producer/kafka_producer.py
@@ -487,7 +609,7 @@ Run Gold transformations:
 python src/transformations/gold_transform.py
 ```
 
-Run pipeline monitoring:
+Run monitoring:
 
 ```bash
 python monitoring/pipeline_monitor.py
@@ -501,14 +623,37 @@ python -m pytest tests/ -v
 
 ---
 
+## Azure Event Hubs Producer
+
+The Azure producer is available at:
+
+```text
+src/producer/azure_eventhub_producer.py
+```
+
+Set the connection string through an environment variable before running it.
+
+PowerShell example:
+
+```powershell
+$env:AZURE_EVENTHUB_CONNECTION_STRING="<your-send-only-connection-string>"
+python src/producer/azure_eventhub_producer.py
+```
+
+**Never commit Azure connection strings, SAS keys, passwords, or Databricks credentials to source control.**
+
+---
+
 ## Key Engineering Concepts Demonstrated
 
-This project demonstrates hands-on experience with:
-
 - Real-time event-driven data pipelines
-- Apache Kafka producers and consumers
+- Apache Kafka
+- Azure Event Hubs
 - Spark Structured Streaming
-- PySpark transformations
+- PySpark
+- Azure Databricks Serverless
+- Delta Lake
+- Unity Catalog
 - Medallion Architecture
 - Bronze / Silver / Gold data modeling
 - Data-quality validation
@@ -517,9 +662,11 @@ This project demonstrates hands-on experience with:
 - Apache Parquet
 - Analytical aggregations
 - Rule-based risk scoring
-- Pipeline observability
+- Secure secret management
+- Streaming checkpointing
+- Pipeline monitoring
 - Automated PySpark testing
-- Dockerized infrastructure
+- Dockerized local infrastructure
 - GitHub Actions CI/CD
 - Git-based software development
 
@@ -529,7 +676,6 @@ This project demonstrates hands-on experience with:
 
 Potential future extensions include:
 
-- Databricks and Delta Lake
 - Azure Data Lake Storage
 - Azure Data Factory
 - Delta Live Tables
@@ -539,14 +685,21 @@ Potential future extensions include:
 - Great Expectations
 - Power BI dashboards
 - Infrastructure as Code using Terraform
+- Advanced cloud monitoring and alerting
 - ML-based anomaly or fraud detection
 
 ---
 
 ## Project Status
 
-**Core local pipeline: Complete**
+**Local pipeline: Complete**
 
-The project currently provides a working end-to-end local implementation from transaction generation through streaming ingestion, lakehouse processing, analytics, monitoring, testing, and CI configuration.
+**Azure cloud deployment: Complete**
 
-Cloud deployment and advanced orchestration are planned as future enhancements.
+**Spark Structured Streaming deployment: Complete**
+
+**Azure Databricks lakehouse validation: Complete**
+
+The project provides a working portfolio-scale implementation from synthetic transaction generation through local Kafka processing and Azure Event Hubs ingestion to Spark Structured Streaming, Delta Lake Medallion processing, data-quality controls, Gold analytics, monitoring, testing, and CI/CD.
+
+The cloud deployment was validated with **1,010 ingested events, 950 clean Silver transactions, 51 quarantined records, 9 valid duplicates removed, and 950 Gold risk-scored transactions**.
